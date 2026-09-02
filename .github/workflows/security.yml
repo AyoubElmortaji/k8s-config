@@ -1,6 +1,6 @@
 name: DevSecOps Pipeline
 
-on:
+"on":
   push:
     branches: [main]
   pull_request:
@@ -56,17 +56,19 @@ jobs:
           cat > policy/k8s.rego << 'EOF'
           package main
 
-          deny[msg] {
+          import rego.v1
+
+          deny contains msg if {
             input.kind == "Deployment"
             not input.spec.template.spec.containers[0].resources.limits
-            msg = "Deployment must have resource limits"
+            msg := "Deployment must have resource limits"
           }
 
-          deny[msg] {
+          deny contains msg if {
             input.kind == "Deployment"
-            input.spec.template.spec.containers[0].image
-            endswith(input.spec.template.spec.containers[0].image, ":latest")
-            msg = "Image tag 'latest' is not allowed"
+            some container in input.spec.template.spec.containers
+            endswith(container.image, ":latest")
+            msg := "Image tag 'latest' is not allowed"
           }
           EOF
 
