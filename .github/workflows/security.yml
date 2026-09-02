@@ -1,0 +1,74 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gitleaks:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy:
+    name: Manifest Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy on K8s manifests
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'apps/'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+  opa:
+    name: Policy Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Conftest
+        run: |
+          wget -q https://github.com/open-policy-agent/conftest/releases/download/v0.46.2/conftest_0.46.2_Linux_x86_64.tar.gz
+          tar xzf conftest_0.46.2_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin/
+
+      - name: Create OPA policies
+        run: |
+          mkdir -p policy
+          cat > policy/k8s.rego << 'EOF'
+          package main
+
+          deny[msg] {
+            input.kind == "Deployment"
+            not input.spec.template.spec.containers[0].resources.limits
+            msg = "Deployment must have resource limits"
+          }
+
+          deny[msg] {
+            input.kind == "Deployment"
+            input.spec.template.spec.containers[0].image
+            endswith(input.spec.template.spec.containers[0].image, ":latest")
+            msg = "Image tag 'latest' is not allowed"
+          }
+          EOF
+
+      - name: Run OPA Conftest
+        run: |
+          conftest test apps/nginx/deployment.yaml -p policy/
