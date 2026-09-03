@@ -38,6 +38,13 @@ spec:
               drop:
                 - ALL
 
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+
+            - name: nginx-run
+              mountPath: /var/run
+
           resources:
             requests:
               memory: "64Mi"
@@ -46,3 +53,10 @@ spec:
             limits:
               memory: "128Mi"
               cpu: "200m"
+
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+
+        - name: nginx-run
+          emptyDir: {}
