@@ -1,6 +1,5 @@
 apiVersion: apps/v1
 kind: Deployment
-
 metadata:
   name: nginx
   labels:
@@ -35,9 +34,12 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             runAsNonRoot: false
+
             capabilities:
               drop:
                 - ALL
+              add:
+                - CHOWN
 
           volumeMounts:
             - name: nginx-cache
